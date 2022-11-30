@@ -1,0 +1,11 @@
+.prettierignore
+.prettierrc.js
+package.json
+package-lock.json
+*.md
+.vscode
+node_modules
+.github
+.eslintignore
+.eslintrc.js
+.eslintcache
