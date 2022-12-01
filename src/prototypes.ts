@@ -1,9 +1,10 @@
 export function initPrototypes(): void {
     // "header guard" to not execute multiple times
     // eslint-disable-next-line no-prototype-builtins
-    if (Array.hasOwnProperty('equals')) {
+    if (Array.prototype.hasOwnProperty('equals')) {
         return;
     }
+
     //some useful Functions, copy from Day 09 and further along to have all useful functions on Arrays
     Object.defineProperty(Array.prototype, 'equals', {
         value<T = unknown>(this: T[], second: T[], amount = -1) {

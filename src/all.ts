@@ -3,7 +3,7 @@ import path from 'path';
 import { terminal as term } from 'terminal-kit';
 import { spawn } from 'child_process';
 import { performance } from 'perf_hooks';
-import { initPrototypes } from './prototpyes';
+import { initPrototypes } from './prototypes';
 import {
     ArgumentProgramOptions,
     ProgramOptions,
@@ -14,7 +14,16 @@ import {
     printOutChristmasTree,
     getAvailableArgs,
 } from './arguments';
-import { SolutionTemplate } from './utils';
+import {
+    Constructable,
+    fromWarningType,
+    IPCTypes,
+    IPCTypesMap,
+    ResultArray,
+    SolutionTemplate,
+    TimingObject,
+    WarningType,
+} from './utils';
 
 function* walkSync(
     dir: string,
@@ -154,35 +163,19 @@ function toArgs(options: ProgramOptions): ProgramStringOptions {
     return result;
 }
 
-export interface ProgramResult {
+export interface ProgramResult<R extends number | string = number | string> {
     timing: TimingObject;
     code: number;
     output: OutputArray;
+    results: ResultArray<R>;
 }
-
-export type IPCTypes = 'slow' | 'time' | 'message';
-
-export type IPCTypeSpecific = {
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    slow: {};
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    message: {};
-    time: {
-        what: keyof TimingObject;
-    };
-};
 
 export type IPCMessage<T extends IPCTypes = IPCTypes> = {
     type: T;
     message: string;
-} & IPCTypeSpecific[T];
+} & IPCTypesMap[T];
 
-export interface TimingObject {
-    start: number;
-    end: number;
-}
-
-export type OutputArray = [string[], string[], string[]];
+export type OutputArray = [stdout: string[], stderr: string[]];
 
 async function runProcess(
     filePath: string,
@@ -191,34 +184,94 @@ async function runProcess(
 ): Promise<ProgramResult> {
     const start = performance.now();
     const timing: TimingObject = { start, end: -1 };
+    const results: Array<number | string> = [];
 
     if (tryDynamicImport === true) {
         let exp = null;
         try {
             exp = (await import(filePath)) as { default: SolutionTemplate };
-            const isSolutionTemplate = Object.is(Object.getPrototypeOf(exp.default), SolutionTemplate);
+            const expClass: SolutionTemplate = exp.default;
+            const isSolutionTemplate = Object.is(Object.getPrototypeOf(expClass), SolutionTemplate);
             if (!isSolutionTemplate) {
                 throw new Error(`exported default doesn't extend the class SolutionTemplate`);
             }
+            return new Promise((resolve) => {
+                const output: OutputArray = [[], []]; // stdout, stderr + error
 
-            const output: OutputArray = [[], [], []]; // stdout, stderr, error
-            let savedLog = null;
-            try {
-                if (options.mute) {
-                    savedLog = console.log;
-                    console.log = (...swallow: any[]) => {};
-                }
+                const savedLog = console.log;
+                console.log = (...data: string[]) => {
+                    output[0].push(...data);
+                    if (options.debug) {
+                        savedLog(...data);
+                    }
+                };
 
-                const obj = new obj.start();
+                const savedError = console.error;
+                console.error = (...data: string[]) => {
+                    output[1].push(...data);
+                    if (options.debug) {
+                        savedError(...data, '\n');
+                    }
+                };
 
-                const result = obj.start(exp.default.options, exp.default.tests);
-            } catch (error) {
-                output[2].push((error as Error).message.toString());
-            } finally {
-                if (savedLog !== null) {
+                let code = 0;
+
+                // eslint-disable-next-line @typescript-eslint/unbound-method
+                const savedExit = process.exit;
+                process.exit = (codeArg?: number | undefined): never => {
+                    const codeL = codeArg ?? code;
+                    resolve({ code: codeL, output, timing, results: results as ResultArray });
+                    throw new Error(
+                        'Error: after resolve, to assure the process.exit never returns, but resolve continued!'
+                    );
+                };
+
+                try {
+                    const obj: SolutionTemplate = new (expClass as unknown as Constructable<SolutionTemplate>)();
+
+                    const result = obj.start((type: WarningType) => {
+                        const [message] = fromWarningType(type);
+                        term.red(`${message}\n`);
+                        term.yellow('To interrupt this press c!\n');
+                        process.stdin.resume();
+                        process.stdin.setEncoding('utf8');
+                        process.stdin.on('data', function (data: Buffer | string) {
+                            if (data.toString().startsWith('c')) {
+                                process.stdin.pause();
+                                output[1].push('Cancelled by User\n');
+                                process.stdin.removeAllListeners();
+
+                                timing.end = performance.now();
+                                resolve({ code: 7, output, timing, results: results as ResultArray });
+                            }
+                        });
+                        return true;
+                    });
+
+                    for (const [key, value] of Object.entries(result.timing)) {
+                        timing[key as keyof TimingObject] = value;
+                    }
+                    code = result.code;
+                    results.push(...result.results);
+                    timing.end = performance.now();
+                } catch (error) {
+                    output[1].push((error as Error).message.toString());
+                    if (options.debug) {
+                        console.error(error, '\n');
+                    }
+                    timing.end = performance.now();
+                    code = 68;
+                } finally {
                     console.log = savedLog;
+                    console.error = savedError;
+                    process.exit = savedExit;
+
+                    process.stdin.pause();
+                    process.stdin.removeAllListeners();
+
+                    resolve({ code, output, timing, results: results as ResultArray });
                 }
-            }
+            });
         } catch (e) {
             if (exp !== null) {
                 console.error(e);
@@ -226,26 +279,22 @@ async function runProcess(
                 process.exit(6);
             }
         }
-
-        if (options.debug && exp != null) {
-            process.exit(76);
-        }
     }
 
     return await new Promise((resolve) => {
-        const output: OutputArray = [[], [], []]; // stdout, stderr, error
+        const output: OutputArray = [[], []]; // stdout, stderr + error
         const program = spawn('node', [filePath, ...toArgs({ ...options, index: undefined } as ProgramOptions)], {
             cwd: path.dirname(filePath),
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
         });
 
-        program.on('error', function (error) {
-            output[2].push(error.message.toString());
+        program.on('error', function (error: Error) {
+            output[1].push(error.message.toString());
             if (program.connected) {
                 program.disconnect();
             }
             timing.end = performance.now();
-            resolve({ code: 69, output, timing });
+            resolve({ code: 68, output, timing, results: results as ResultArray });
         });
 
         program.stdout?.on('data', function (data: string | Buffer) {
@@ -259,17 +308,18 @@ async function runProcess(
             output[1].push(data.toString());
         });
 
-        program.on('message', function (message) {
+        program.on('message', function (msg) {
             let res: IPCMessage;
             try {
-                res = JSON.parse(message.toString()) as IPCMessage;
+                res = JSON.parse(msg.toString()) as IPCMessage;
             } catch (err) {
                 term.red("Couldn't parse IPC message!\n");
                 return;
             }
             switch (res.type) {
-                case 'slow':
-                    term.red(`${res.message}\n`);
+                case 'slow': {
+                    const { message } = res as IPCMessage<'slow'>;
+                    term.red(`${message}\n`);
                     term.yellow('To interrupt this press c!\n');
                     process.stdin.resume();
                     process.stdin.setEncoding('utf8');
@@ -277,21 +327,31 @@ async function runProcess(
                         if (data.toString().startsWith('c')) {
                             program.kill('SIGINT'); // used signal(but not manually by Ctrl+C), to indicate the right thing!
                             process.stdin.pause();
-                            output[2].push('Cancelled by User\n');
+                            output[1].push('Cancelled by User\n');
                             if (program.connected) {
                                 program.disconnect();
                             }
                             timing.end = performance.now();
-                            resolve({ code: 7, output, timing });
+                            resolve({ code: 7, output, timing, results: results as ResultArray });
                         }
                     });
                     break;
-                case 'time':
-                    timing[(res as IPCMessage<'time'>).what] = performance.now();
+                }
+                case 'time': {
+                    const { what } = res as IPCMessage<'time'>;
+                    timing[what] = performance.now();
                     break;
-                case 'message':
-                    output[0].push(res.message);
+                }
+                case 'result': {
+                    const { value } = res as IPCMessage<'result'>;
+                    results.push(value);
                     break;
+                }
+                case 'message': {
+                    const { message } = res as IPCMessage<'message'>;
+                    output[0].push(message);
+                    break;
+                }
                 default:
                     term.red(`Not recognized IPC message of type: ${res.type as string}`);
                     break;
@@ -302,7 +362,7 @@ async function runProcess(
                 program.disconnect();
             }
             timing.end = performance.now();
-            resolve({ code: code ?? 1, output, timing });
+            resolve({ code: code ?? 1, output, timing, results: results as ResultArray });
         });
     });
 }
@@ -319,10 +379,12 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
         term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
     }
 
-    const { code, output, timing } = await runProcess(selected.filePath, options, true);
+    const { code, output, timing, results } = await runProcess(selected.filePath, options, true);
 
     let timeString: string;
-    if (options.debug) {
+    if (timing.end < 0 || timing.start < 0) {
+        timeString = '^rTiming error';
+    } else if (options.debug) {
         timeString = 'Timings:\n';
         const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
             (a, b) => a[1] - b[1]
@@ -330,8 +392,8 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
 
         for (let index = 0; index < sortedTimings.length; ++index) {
             const [name, time] = sortedTimings.atSafe(index);
-            if (name !== 'start') {
-                timeString += `^g${name}: ${formatTime(time - sortedTimings[index - 1][1])}${
+            if (name !== 'start' && time !== undefined) {
+                timeString += `^g${name}: ${formatTime(time - (sortedTimings[index - 1]?.[1] ?? 0))}${
                     index < sortedTimings.length - 1 ? '\n' : '\n'
                 }`;
             }
@@ -340,30 +402,30 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
     } else {
         timeString = `It took ${formatTime(timing.end - timing.start)}`;
     }
-    if (code === 0) {
+    if (code === 0 && output[1].length === 0) {
         if (!options.mute) {
-            term.cyan(`Got Results:\n${output[0].join('')}\n^y${timeString}\n\n`);
+            term.cyan(`Got Results:\nPart 1: '${results[0]}'\nPart 2: '${results[1]}'\n\n^y${timeString}\n\n`);
         }
     } else {
         switch (code) {
             case 43:
                 if (!options.mute) {
-                    term.yellow(`${output[0].join('')}`);
+                    term.yellow(`${output[0].join('\n')}`);
                     term.yellow(`${timeString}\n\n`);
                 }
                 break;
             case 7:
                 if (!options.mute) {
-                    term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+                    term.yellow(`${output[1].join('\n')}\n^y${timeString}\n\n`);
                 }
                 break;
             case 69:
-                term.red(`Test failed with: ${code}:\n${output[1].join('')}`);
-                term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+                term.red(`Test failed with: ${code}:\n${output[1].join('\n')}`);
+                term.yellow(`\n^y${timeString}\n\n`);
                 break;
             default:
-                term.red(`Got Error with code ${code}:\n${output[1].join('')}`);
-                term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+                term.red(`Got Error with code ${code}:\n${output[1].join('\n')}`);
+                term.yellow(`\n^y${timeString}\n\n`);
         }
     }
 }

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { parseArgs, ProgramOptions } from './arguments';
-import { initPrototypes } from './prototpyes';
+import { initPrototypes } from './prototypes';
 const debug = ['1', 'true', 'on', 'enabled', 'enable'].includes(process.env['DEBUG'] ?? '0');
 
 export function logDebug(...args: unknown[]): boolean {
@@ -41,6 +41,12 @@ export function getFile(
 
 export type WarningType = 0 | 1 | 2;
 
+export function fromWarningType(type: WarningType): [message: string, level: IPCLevel] {
+    const message = type === 0 ? 'Attention: Moderately Slow' : type === 1 ? 'ATTENTION: SLOW' : 'Unknown Slow Type';
+    const level = type === 0 ? 'moderate' : type === 1 ? 'severe' : 'unknown';
+    return [message, level];
+}
+
 function slowWarning(type: WarningType) {
     process.on('SIGINT', () => {
         if (process.connected) {
@@ -48,8 +54,7 @@ function slowWarning(type: WarningType) {
         }
         process.exit(0);
     });
-    const message = type === 0 ? 'Attention: Moderately Slow' : type === 1 ? 'ATTENTION: SLOW' : 'Unknown Slow Type';
-    const level = type === 0 ? 'moderate' : type === 1 ? 'severe' : 'unknown';
+    const [message, level] = fromWarningType(type);
     return sendIpc({ type: 'slow', message, level });
 }
 
@@ -60,9 +65,12 @@ export interface IPCTypesMap {
         message: string;
         level: IPCLevel;
     };
+    result: {
+        value: number | string;
+    };
     message: { message: string };
     time: {
-        what: string;
+        what: AllPossibleTimingTypes;
     };
 }
 
@@ -71,7 +79,7 @@ export type IPCOptions<T extends IPCTypes = IPCTypes> = {
     type: T;
 } & IPCTypesMap[T];
 
-function sendIpc(options: IPCOptions | string) {
+function sendIpc<T extends IPCTypes>(options: IPCOptions<T> | string) {
     if (process.send) {
         if (typeof options !== 'string') {
             options = JSON.stringify(options);
@@ -128,20 +136,20 @@ export function start(filename: string | undefined, methods: StartMethods, optio
     if (methods.solve !== undefined) {
         const realInput = getFile('./input.txt', filename, separator, filterOutEmptyLines);
         const Answer = methods.solve(realInput);
-        sendIpc({ type: 'message', message: `Part 1: '${Answer}'\n` });
+        sendIpc({ type: 'result', value: Answer });
         sendIpc({ type: 'time', what: 'part1' });
     } else if (methods.solveMessage !== undefined) {
-        sendIpc({ type: 'message', message: `Part 1: '${methods.solveMessage}\n'` });
+        sendIpc({ type: 'result', value: methods.solveMessage });
         sendIpc({ type: 'time', what: 'part1' });
     }
 
     if (methods.solve2 !== undefined) {
         const realInput2 = getFile('./input.txt', filename, separator, filterOutEmptyLines);
         const Answer2 = methods.solve2(realInput2);
-        sendIpc({ type: 'message', message: `Part 2: '${Answer2}'\n` });
+        sendIpc({ type: 'result', value: Answer2 });
         sendIpc({ type: 'time', what: 'part2' });
     } else if (methods.solve2Message !== undefined) {
-        sendIpc({ type: 'message', message: `Part 2: '${methods.solve2Message}'\n` });
+        sendIpc({ type: 'result', value: methods.solve2Message });
         sendIpc({ type: 'time', what: 'part2' });
     }
 
@@ -175,7 +183,7 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         return this.parse?.(input) ?? (input as unknown as T);
     }
 
-    testBoth(options: AdvancedStartOptions, testOptions: TestOptions, mute: boolean): void {
+    testBoth(options: AdvancedStartOptions, testOptions: TestOptions<R>, mute: boolean): void {
         const testInput = getFile(
             './sample.txt',
             options.filename,
@@ -209,8 +217,13 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         }
     }
 
-    start(options: AdvancedStartOptions, testOptions: TestOptions, pseudoIpc): void {
-        pseudoIpc({ type: 'time', what: 'start' });
+    start(slowWarningHandler: typeof slowWarning): ExecuteResult<R> {
+        const timing: TimingObject = { start: performance.now(), end: -1 };
+        // eslint-disable-next-line this/no-this
+        const options: AdvancedStartOptions = this.options;
+        // eslint-disable-next-line this/no-this
+        const testOptions: TestOptions<R> = this.tests;
+
         const args: ProgramOptions = parseArgs();
         logDebug(`parsed argv: `, args, 'real argv:', process.argv);
         if (options.needsPrototypes === true) {
@@ -220,14 +233,14 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         if (!args.noTests) {
             // eslint-disable-next-line this/no-this
             this.testBoth(options, testOptions, args.mute);
-            pseudoIpc({ type: 'time', what: 'tests' });
+            timing.tests = performance.now();
         }
         if (options.slowness !== undefined && args.skipSlow) {
-            pseudoIpc({ type: 'message', message: 'Auto Skipped Moderately Slow\n' });
+            console.log('Auto Skipped Moderately Slow\n');
             process.exit(43);
         }
         if (options.slowness !== undefined) {
-            slowWarning(options.slowness, pseudoIpc);
+            slowWarningHandler(options.slowness);
         }
 
         const { separator, filterOutEmptyLines } = options.inputOptions || {
@@ -241,14 +254,37 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
 
         // eslint-disable-next-line this/no-this
         const Answer = this.solve(parsed);
-        pseudoIpc({ type: 'message', message: `Part 1: '${Answer}'\n` });
-        pseudoIpc({ type: 'time', what: 'part1' });
+        timing.tests = performance.now();
+        timing.part1 = performance.now();
 
         // eslint-disable-next-line this/no-this
         const Answer2 = this.solve2(parsed);
-        pseudoIpc({ type: 'message', message: `Part 2: '${Answer2}'\n` });
-        pseudoIpc({ type: 'time', what: 'part2' });
+        timing.part2 = performance.now();
 
-        process.exit(0);
+        return { code: 0, timing, results: [Answer, Answer2] };
     }
 }
+
+export interface Constructable<T = unknown> {
+    new (): T;
+}
+
+export type AllPossibleTimingTypes = PossibleTimingTypes | OptionalTimingTypes;
+
+export type PossibleTimingTypes = 'start' | 'end';
+
+export type OptionalTimingTypes = 'tests' | 'part1' | 'part2';
+
+export type TimingObject = {
+    [key in PossibleTimingTypes]: number;
+} & {
+    [key in OptionalTimingTypes]?: number;
+};
+
+export interface ExecuteResult<R extends number | string> {
+    timing: TimingObject;
+    code: number;
+    results: ResultArray<R>;
+}
+
+export type ResultArray<R extends number | string = number | string> = [answer1: R, answer2: R];
