@@ -105,7 +105,7 @@ export function printHelp(): never {
     }
     term.red(
         '\n\n',
-        "Note: The selection mode has some serious bugs, like Aborting with Ctrl+C doesn't work ans some minor ones, so if you need to run one please consider using --{number} instead!"
+        "Note: The selection mode has some serious bugs, like Aborting with Ctrl+C doesn't work and some minor ones, so if you need to run one please consider using --{number} instead!\n"
     );
     process.exit(0);
 }
@@ -244,7 +244,7 @@ export function getAvailableArgs(): AvailableProgramOptions[] {
             args: ['--debug', '-d', '--verbose', '-v'],
             representation: 'debug',
             description:
-                "Print additional Information, at the moment only additional timing and argv logging is available. for additional debugging set debug in 'utils.js' to 'true'",
+                "Print additional Information, at the moment only additional timing and argv logging is available. for additional debugging set the 'DEBUG' env variable to true/1",
         },
     ];
 

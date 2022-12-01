@@ -13,6 +13,7 @@ import {
     ParsableProgramOptions,
     printOutChristmasTree,
     getAvailableArgs,
+    printHelp,
 } from './arguments';
 import {
     Constructable,
@@ -83,24 +84,36 @@ async function main() {
     }
     if (options.index === 'select') {
         term.green('Select an Option:\n');
-        const items = ['all: Run all Available Solutions'].concat(
+        const items = ['help: get Help menu', 'all: Run all Available Solutions'].concat(
             AllNumbers.map((a) => `${a.number}: Run the Solution of Day ${a.number.toString().padStart(2, '0')}`)
         );
-        term.singleColumnMenu(items, {}, function (error, response) {
-            term.previousLine(AllNumbers.length + 1);
-            term.eraseDisplayBelow();
-            runThat({ ...options, index: response.selectedIndex }, AllNumbers)
-                // eslint-disable-next-line github/no-then
-                .then(() => {
-                    process.exit(0);
-                })
-                // eslint-disable-next-line github/no-then
-                .catch(console.error);
+        await new Promise<void>((resolve) => {
+            term.singleColumnMenu(items, {}, function (error, response) {
+                term.previousLine(items.length);
+                term.eraseDisplayBelow();
+                const { selectedIndex } = response;
+                if (selectedIndex === 0) {
+                    printHelp();
+                }
+                runThat(
+                    { ...options, index: response.selectedIndex - (items.length - AllNumbers.length) + 1 },
+                    AllNumbers
+                )
+                    // eslint-disable-next-line github/no-then
+                    .then(() => {
+                        resolve();
+                    })
+                    // eslint-disable-next-line github/no-then
+                    .catch((...data) => {
+                        console.error(...data);
+                        resolve();
+                    });
+            });
         });
     } else {
         await runThat(options, AllNumbers);
-        process.exit(0);
     }
+    process.exit(0);
 }
 
 async function runThat(options: ExtendedProgramOptions, AllNumbers: DaysObject[]) {
