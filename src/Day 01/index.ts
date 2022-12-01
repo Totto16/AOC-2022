@@ -52,5 +52,3 @@ start(
     { tests: TestBoth, solve, solve2 },
     { needsPrototypes: true, inputOptions: { filterOutEmptyLines: false, separator: '\n' } }
 );
-
-//npm run compile && node . --1 -d

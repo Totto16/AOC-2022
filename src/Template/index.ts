@@ -1,30 +1,31 @@
-import { start, getFile } from '../utils';
+import { SolutionTemplate, TestOptions, AdvancedStartOptions } from '../utils';
 
-function solve(input: string[]): number {
-    return -1;
-}
+type ParseType = string[];
+export default class Solution extends SolutionTemplate<ParseType, number> {
+    options: AdvancedStartOptions = {
+        filename: __filename,
+        needsPrototypes: true,
+        inputOptions: { filterOutEmptyLines: true, separator: '\n' },
+    };
 
-function solve2(input: string[]) {
-    return -1;
-}
+    tests: TestOptions = {
+        first: {
+            result: -1,
+        },
+        second: {
+            result: -1,
+        },
+    };
 
-function TestBoth() {
-    const testInput = getFile('./sample.txt', __filename);
-
-    const testResult = 0;
-    const testResult2 = 0;
-
-    const test = solve(testInput);
-    if (test !== testResult) {
-        console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
-        process.exit(69);
+    parse(input: string[]): ParseType {
+        return input;
     }
 
-    const test2 = solve2(testInput);
-    if (test2 !== testResult2) {
-        console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
-        process.exit(69);
+    solve(input: ParseType): number {
+        return -1;
+    }
+
+    solve2(input: ParseType): number {
+        return -1;
     }
 }
-
-start(__filename, { tests: TestBoth, solve, solve2 }, { needsPrototypes: true });
