@@ -111,7 +111,24 @@ export interface StartMethods {
     solve2Message?: string;
 }
 
+export function isEntryPoint(): boolean {
+    const main = require.main;
+    if (main === undefined) {
+        return true;
+    }
+    for (const child of main.children) {
+        if (/Day \d{2}\/index\.js/.test(child.id)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export function start(filename: string | undefined, methods: StartMethods, options?: StartOptions): never {
+    // if trying to dynamically import a file, where start is called, we just return, this is like a "header guard"
+    if (!isEntryPoint()) {
+        throw new Error('reached never, this is as expected');
+    }
     options = options || {};
     sendIpc({ type: 'time', what: 'start' });
     const args: ProgramOptions = parseArgs();

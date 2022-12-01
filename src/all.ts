@@ -189,7 +189,11 @@ async function runProcess(
     if (tryDynamicImport === true) {
         let exp = null;
         try {
-            exp = (await import(filePath)) as { default: SolutionTemplate };
+            exp = (await import(filePath)) as { default: SolutionTemplate | undefined };
+            if (exp.default === undefined) {
+                exp = null;
+                throw new Error('Normal file');
+            }
             const expClass: SolutionTemplate = exp.default;
             const isSolutionTemplate = Object.is(Object.getPrototypeOf(expClass), SolutionTemplate);
             if (!isSolutionTemplate) {
@@ -378,7 +382,6 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
     if (!options.mute) {
         term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
     }
-
     const { code, output, timing, results } = await runProcess(selected.filePath, options, true);
 
     let timeString: string;
@@ -403,6 +406,9 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
         timeString = `It took ${formatTime(timing.end - timing.start)}`;
     }
     if (code === 0 && output[1].length === 0) {
+        if ((results as number[]).length !== 2) {
+            throw new Error(`Not enough results received, only got ${results.length}!`);
+        }
         if (!options.mute) {
             term.cyan(`Got Results:\nPart 1: '${results[0]}'\nPart 2: '${results[1]}'\n\n^y${timeString}\n\n`);
         }

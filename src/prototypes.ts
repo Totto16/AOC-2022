@@ -236,6 +236,21 @@ export function initPrototypes(): void {
         },
     });
 
+    Object.defineProperty(Array.prototype, 'sum', {
+        value(this: Array<number> | Array<number[]>, start = 0): number {
+            // eslint-disable-next-line this/no-this, @typescript-eslint/no-this-alias
+            const first: number[] | number[][] = this;
+            if (first.length === 0) {
+                return start;
+            }
+            if (!Array.isArray(first[0])) {
+                return (first as number[]).reduce((acc, el) => acc + el, start);
+            } else {
+                return (first as number[][]).reduce((acc, el) => acc + el.sum(), start);
+            }
+        },
+    });
+
     Object.defineProperty(Number.prototype, 'clamp', {
         value(this: number, min: number, max: number, endInclusive = false): number {
             // eslint-disable-next-line this/no-this, @typescript-eslint/no-this-alias

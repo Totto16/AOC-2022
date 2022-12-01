@@ -111,7 +111,7 @@ export function printHelp(): never {
 }
 
 export function printOutChristmasTree(): void {
-    function* gen(): Generator<string, string> {
+    /*   function* gen(): Generator<string, string> {
         const available = 'bcmyrgw'.split('');
         do {
             const i = Math.floor(Math.random() * available.length);
@@ -158,7 +158,7 @@ export function printOutChristmasTree(): void {
     term.yellow(`     '. ^b.${color.next().value}.  ^y:             ^wA^yO^gC ^c2^b0^m2^r1              \n`);
     term.yellow(`      : ^b~.${color.next().value}.^y.'                ^gb^cy                 \n`);
     term.yellow(`      : ${color.next().value}. ^y.'                ^yT^go^ct^bt^mo               \n`);
-    term.yellow(`      :..:                                      \n`);
+    term.yellow(`      :..:                                      \n`); */
     process.exit(0);
 }
 
