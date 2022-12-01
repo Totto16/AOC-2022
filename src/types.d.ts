@@ -1,4 +1,4 @@
-import { CountFunction, PossibleFillTypes, PrintNestedMapFunction, StringOfLength } from './utils';
+import { CountFunction, PossibleFillTypes, PrintNestedMapFunction, StringOfLength } from './prototypes';
 
 export {};
 declare global {
@@ -24,6 +24,7 @@ declare global {
             number: number | Array<number>,
             constraintFunction?: (nr: number, index: number) => number
         ): Array<number>;
+        sum(this: Array<number> | Array<number[]>, start?: number): number;
     }
 
     interface Object {
