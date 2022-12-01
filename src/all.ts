@@ -3,7 +3,18 @@ import path from 'path';
 import { terminal as term } from 'terminal-kit';
 import { spawn } from 'child_process';
 import { performance } from 'perf_hooks';
-import { initPrototypes } from './utils';
+import { initPrototypes } from './prototpyes';
+import {
+    ArgumentProgramOptions,
+    ProgramOptions,
+    ExtendedProgramOptions,
+    parseArgs,
+    AvailableProgramOptions,
+    ParsableProgramOptions,
+    printOutChristmasTree,
+    getAvailableArgs,
+} from './arguments';
+import { SolutionTemplate } from './utils';
 
 function* walkSync(
     dir: string,
@@ -25,18 +36,6 @@ function* walkSync(
         }
     }
 }
-export type ProgramOptions = {
-    skipSlow: boolean;
-    noTests: boolean;
-    mute: boolean;
-    debug: boolean;
-};
-
-export type ExtendedProgramOptions = {
-    index: number | 'select';
-} & ProgramOptions;
-
-export type ArgumentProgramOptions = 'autoskipslow' | 'no-tests' | 'mute' | 'debug' | 'verbose';
 
 export type ProgramOptionsMapType = {
     [key in ArgumentProgramOptions]: keyof ProgramOptions;
@@ -51,85 +50,6 @@ export const ProgramOptionsMap: ProgramOptionsMapType = {
     debug: 'debug',
     verbose: 'debug',
 };
-
-export function parseArgs(): ExtendedProgramOptions {
-    const options: ExtendedProgramOptions = {
-        index: 'select',
-        skipSlow: false,
-        noTests: false,
-        mute: false,
-        debug: false,
-    };
-    for (const string of process.argv) {
-        if (string.startsWith('-')) {
-            const arg = string.replace('-', '');
-            const arg2 = string.replace('--', '');
-            const isNumber = !isNaN(parseInt(arg2)) ? parseInt(arg2) : false;
-            switch (arg) {
-                case '-all':
-                    options.index = 0;
-                    break;
-                case '-help':
-                    printHelp();
-                    break;
-                case 'h':
-                    printHelp();
-                    break;
-                case '?':
-                    printHelp();
-                    break;
-                case '-no-tests':
-                    options.noTests = true;
-                    break;
-                case 't':
-                    options.noTests = true;
-                    break;
-                case '-autoskipslow':
-                    options.skipSlow = true;
-                    break;
-                case 's':
-                    options.skipSlow = true;
-                    break;
-                case 'm':
-                    options.mute = true;
-                    break;
-                case '-mute':
-                    options.mute = true;
-                    break;
-                case 'd':
-                    options.debug = true;
-                    break;
-                case '-debug':
-                    options.debug = true;
-                    break;
-                case 'v':
-                    options.debug = true;
-                    break;
-                case '-verbose':
-                    options.debug = true;
-                    break;
-                case 'f':
-                    printOutChristmasTree();
-                    break;
-                case '-format':
-                    printOutChristmasTree();
-                    break;
-                case '-tree':
-                    printOutChristmasTree();
-                    break;
-                default:
-                    if (isNumber !== false) {
-                        options.index = isNumber;
-                    }
-                    break;
-            }
-        } else if (string.trim() === '?') {
-            printHelp();
-        }
-    }
-
-    return options;
-}
 
 export interface DaysObject {
     number: number;
@@ -174,215 +94,12 @@ async function main() {
     }
 }
 
-export type ProgramTypes = 'normal' | 'internal' | 'which';
-
-export type ProgramTypesParams = {
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    normal: {};
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    internal: {};
-    which: {
-        params: string[];
-    };
-};
-
-export type AvailableProgramOptions<T extends ProgramTypes = ProgramTypes> =
-    | NormalProgramOptions<T>
-    | ParsableProgramOptions<T>;
-
-export type NormalProgramOptions<T extends ProgramTypes = ProgramTypes> = {
-    type: T;
-    args: [`--${string}`, ...string[]];
-    description: string;
-} & ProgramTypesParams[T];
-
-export type ParsableProgramOptions<T extends ProgramTypes = ProgramTypes> = {
-    type: T;
-    args: [
-        `--${ArgumentProgramOptions}`,
-        `-${ArgumentProgramOptions[0]}`,
-        ...(unknown[] | [`--${ArgumentProgramOptions}` | `-${ArgumentProgramOptions[0]}`])
-    ];
-    description: string;
-    representation: keyof ProgramOptions;
-} & ProgramTypesParams[T];
-
-function getAvailableArgs(): AvailableProgramOptions[] {
-    const NormalOpts: NormalProgramOptions[] = [
-        {
-            type: 'normal',
-            args: ['--all'],
-            description: 'Runs all available Solutions',
-        },
-        {
-            type: 'normal',
-            args: ['--format', '-f', '--tree'],
-            description: 'Prints the picture of the calender on the website!',
-        },
-        {
-            type: 'normal',
-            args: ['--help', '-h', '-?'],
-            description: 'Shows this help page',
-        },
-        {
-            type: 'which',
-            args: ['--{number}'],
-            params: ['{number} is a valid Number from Day 1 - actual Day, maximum 25'],
-            description: 'Runs the Solution for that day',
-        },
-    ];
-
-    const ParsableOpts: ParsableProgramOptions[] = [
-        {
-            type: 'internal',
-            args: ['--no-tests', '-t'],
-            representation: 'noTests',
-            description: 'Skips the tests, the performance is slightly better',
-        },
-        {
-            type: 'internal',
-            args: ['--autoskipslow', '-s'],
-            representation: 'skipSlow',
-            description: 'Auto skips solutions marked as slow',
-        },
-        {
-            type: 'internal',
-            args: ['--mute', '-m'],
-            representation: 'mute',
-            description: 'Completely mutes everything (Status code will indicate only the status))',
-        },
-        {
-            type: 'internal',
-            args: ['--debug', '-d', '--verbose', '-v'],
-            representation: 'debug',
-            description:
-                "Print additional Information, at the moment only additional timing and argv logging is available. for additional debugging set debug in 'utils.js' to 'true'",
-        },
-    ];
-
-    const AvailableArgs: AvailableProgramOptions[] = [...NormalOpts, ...ParsableOpts];
-
-    return AvailableArgs;
-}
-
-function printHelp(): never {
-    const AvailableArgs = getAvailableArgs();
-
-    term.blue('HELP Page:\n\n');
-    term.cyan('node . [options]\n\nOptions:\n');
-
-    for (const arg of AvailableArgs) {
-        const { args, description } = arg;
-        const text = `${args.join(', ')}${
-            arg.type === 'which' ? ` -> ${(arg as AvailableProgramOptions<'which'>).params.join(', ')}` : ''
-        } : ${description}`;
-        term.green(`${text}\n`);
-    }
-    term.red(
-        '\n\n',
-        "Note: The selection mode has some serious bugs, like Aborting with Ctrl+C doesn't work ans some minor ones, so if you need to run one please consider using --{number} instead!"
-    );
-    process.exit(0);
-}
-
-function printOutChristmasTree() {
-    function* gen(): Generator<string, string> {
-        const available = 'bcmyrgw'.split('');
-        do {
-            const i = Math.floor(Math.random() * available.length);
-            yield `^${available.atSafe(i)}`;
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        } while (true);
-    }
-    const color = gen();
-    term.cyan(`~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n`);
-    term.cyan(` .       .  .      .  . '  ...   ^w.   ^c.  ${color.next().value}.  ^y..''''\n`);
-    term.cyan(`    .  .           . . .        ^w. ^c.  ${color.next().value}.^c.${color.next().value}.  ^y:      \n`);
-    term.cyan(` ~     . .      '     .    .' ${color.next().value}. ^w.' ${color.next().value}.  ^y....'      \n`);
-    term.cyan(`~     . '...    ' .         ${color.next().value}. ^y.^r.^w|\\^r.^y.''           \n`);
-    term.cyan(`   ..                      ${color.next().value}. ^y:                   \n`);
-    term.cyan(`     .'         . '.     ${color.next().value}.^y:'                     \n`);
-    term.cyan(`.    ~    '    ^b.^c'..        ${color.next().value}.^y'''''.....  ...^r.     \n`);
-    term.cyan(
-        `^b.^c~ .          .  .        ^y:'..${color.next().value}. ^y..${color.next().value}.  ${
-            color.next().value
-        }.^y''${color.next().value}.   ^r':   \n`
-    );
-    term.cyan(
-        `   ^b'^c .           .   . .  ^y:   ''  ''''..  ${color.next().value}. ${color.next().value}.^r'^y.  \n`
-    );
-    term.blue(`.            .^c.      ^b.    ^y:             '..'.${color.next().value}.^y:  \n`);
-    term.blue(`          .         .    ^y:       :'''..   ..'${color.next().value}.^y:  \n`);
-    term.blue(
-        `    .   . '          ^c. ^y.'    ..''${color.next().value}.   ${color.next().value}. ^y'''${
-            color.next().value
-        }.^y...:  \n`
-    );
-    term.blue(` .     . '.         ^c. ^y: ...''${color.next().value}. ^y..':   ^r..^y..'      \n`);
-    term.blue(
-        `. .    . .   .   ${color.next().value}.  ${color.next().value}. ^y:'${
-            color.next().value
-        }.^y...'''    ^y'^r''           \n`
-    );
-    term.yellow(`'.'.  ^b.    ^c'   ${color.next().value}.^y:'. ....'                        \n`);
-    term.yellow(`   :         ${color.next().value}.^b' ^y:  '                             \n`);
-    term.yellow(`   :        ${color.next().value}. ^y..'                                \n`);
-    term.yellow(`   '. ^b.    ${color.next().value}.^b. ^y:                                  \n`);
-    term.yellow(`    '.     ^b.${color.next().value}. ^y:                                   \n`);
-    term.yellow(`     :  ^c.^b.${color.next().value}. ^y:                                     \n`);
-    term.yellow(`     '. ^b.${color.next().value}.  ^y:             ^wA^yO^gC ^c2^b0^m2^r1              \n`);
-    term.yellow(`      : ^b~.${color.next().value}.^y.'                ^gb^cy                 \n`);
-    term.yellow(`      : ${color.next().value}. ^y.'                ^yT^go^ct^bt^mo               \n`);
-    term.yellow(`      :..:                                      \n`);
-    process.exit(0);
-}
-
 async function runThat(options: ExtendedProgramOptions, AllNumbers: DaysObject[]) {
     if (options.index === 0) {
         term.blue(`Now running ALL Available Solutions:\n`);
         for (let i = 0; i < AllNumbers.length; i++) {
             const selected: DaysObject = AllNumbers.atSafe(i);
-            term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
-            const { code, output, timing } = await runProcess(selected.filePath, options);
-            let timeString: string;
-            if (options.debug) {
-                timeString = 'Timings:\n';
-                const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
-                    (a, b) => a[1] - b[1]
-                ) as ObjectEntries<TimingObject>;
-
-                for (let index = 0; index < sortedTimings.length; ++index) {
-                    const [name, time] = sortedTimings.atSafe(index);
-                    if (name !== 'start') {
-                        timeString += `^g${name}: ${formatTime(time - sortedTimings[index - 1][1])}${
-                            index < sortedTimings.length - 1 ? '\n' : '\n'
-                        }`;
-                    }
-                }
-                timeString += `^gall: ${formatTime(timing.end - timing.start)}`;
-            } else {
-                timeString = `It took ${formatTime(timing.end - timing.start)}`;
-            }
-            if (code === 0) {
-                !options.mute && term.cyan(`Got Results:\n${output[0].join('')}\n^y${timeString}\n\n`);
-            } else {
-                switch (code) {
-                    case 43:
-                        !options.mute && term.yellow(`${output[0].join('')}`);
-                        !options.mute && term.yellow(`${timeString}\n\n`);
-                        break;
-                    case 7:
-                        !options.mute && term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-                        break;
-                    case 69:
-                        term.red(`Test failed with: ${code}:\n${output[1].join('')}`);
-                        term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-                        break;
-                    default:
-                        term.red(`Got Error with code ${code}:\n${output[1].join('')}`);
-                        term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-                }
-            }
+            await runSolution(selected, options);
         }
         printOutChristmasTree();
     } else {
@@ -390,53 +107,12 @@ async function runThat(options: ExtendedProgramOptions, AllNumbers: DaysObject[]
             console.error('UNREACHABLE');
             process.exit(1);
         }
-        const selected = AllNumbers[options.index - 1];
-        if (AllNumbers.length + 1 < options.index) {
+        if (AllNumbers.length + 1 < options.index || options.index <= 0) {
             term.red(`This number is not supported: ${options.index}\n`);
             process.exit(1);
         }
-        !options.mute && term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
-        const { code, output, timing } = await runProcess(selected.filePath, options);
-        let timeString: string;
-        if (options.debug) {
-            timeString = 'Timings:\n';
-            const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
-                (a, b) => a[1] - b[1]
-            ) as ObjectEntries<TimingObject>;
-
-            for (let index = 0; index < sortedTimings.length; ++index) {
-                const [name, time] = sortedTimings.atSafe(index);
-                if (name !== 'start') {
-                    timeString += `^g${name}: ${formatTime(time - sortedTimings[index - 1][1])}${
-                        index < sortedTimings.length - 1 ? '\n' : '\n'
-                    }`;
-                }
-            }
-
-            timeString += `^gall: ${formatTime(timing.end - timing.start)}`;
-        } else {
-            timeString = `It took ${formatTime(timing.end - timing.start)}`;
-        }
-        if (code === 0) {
-            !options.mute && term.cyan(`Got Results:\n${output[0].join('')}\n^y${timeString}\n\n`);
-        } else {
-            switch (code) {
-                case 43:
-                    !options.mute && term.yellow(`${output[0].join('')}`);
-                    !options.mute && term.yellow(`${timeString}\n\n`);
-                    break;
-                case 7:
-                    !options.mute && term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-                    break;
-                case 69:
-                    term.red(`Test failed with: ${code}:\n${output[1].join('')}`);
-                    term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-                    break;
-                default:
-                    term.red(`Got Error with code ${code}:\n${output[1].join('')}`);
-                    term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
-            }
-        }
+        const selected = AllNumbers.atSafe(options.index - 1);
+        await runSolution(selected, options);
     }
 }
 
@@ -508,9 +184,54 @@ export interface TimingObject {
 
 export type OutputArray = [string[], string[], string[]];
 
-async function runProcess(filePath: string, options: ExtendedProgramOptions): Promise<ProgramResult> {
+async function runProcess(
+    filePath: string,
+    options: ExtendedProgramOptions,
+    tryDynamicImport?: boolean
+): Promise<ProgramResult> {
     const start = performance.now();
     const timing: TimingObject = { start, end: -1 };
+
+    if (tryDynamicImport === true) {
+        let exp = null;
+        try {
+            exp = (await import(filePath)) as { default: SolutionTemplate };
+            const isSolutionTemplate = Object.is(Object.getPrototypeOf(exp.default), SolutionTemplate);
+            if (!isSolutionTemplate) {
+                throw new Error(`exported default doesn't extend the class SolutionTemplate`);
+            }
+
+            const output: OutputArray = [[], [], []]; // stdout, stderr, error
+            let savedLog = null;
+            try {
+                if (options.mute) {
+                    savedLog = console.log;
+                    console.log = (...swallow: any[]) => {};
+                }
+
+                const obj = new obj.start();
+
+                const result = obj.start(exp.default.options, exp.default.tests);
+            } catch (error) {
+                output[2].push((error as Error).message.toString());
+            } finally {
+                if (savedLog !== null) {
+                    console.log = savedLog;
+                }
+            }
+        } catch (e) {
+            if (exp !== null) {
+                console.error(e);
+                console.error(`Error in dynamic import of Solution file: ${filePath}`);
+                process.exit(6);
+            }
+        }
+
+        if (options.debug && exp != null) {
+            process.exit(76);
+        }
+    }
+
     return await new Promise((resolve) => {
         const output: OutputArray = [[], [], []]; // stdout, stderr, error
         const program = spawn('node', [filePath, ...toArgs({ ...options, index: undefined } as ProgramOptions)], {
@@ -591,6 +312,60 @@ function UserCancel() {
         term.red(`\nEverything was cancelled by User\n`);
         process.exit(0);
     });
+}
+
+async function runSolution(selected: DaysObject, options: ExtendedProgramOptions) {
+    if (!options.mute) {
+        term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
+    }
+
+    const { code, output, timing } = await runProcess(selected.filePath, options, true);
+
+    let timeString: string;
+    if (options.debug) {
+        timeString = 'Timings:\n';
+        const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
+            (a, b) => a[1] - b[1]
+        ) as ObjectEntries<TimingObject>;
+
+        for (let index = 0; index < sortedTimings.length; ++index) {
+            const [name, time] = sortedTimings.atSafe(index);
+            if (name !== 'start') {
+                timeString += `^g${name}: ${formatTime(time - sortedTimings[index - 1][1])}${
+                    index < sortedTimings.length - 1 ? '\n' : '\n'
+                }`;
+            }
+        }
+        timeString += `^gall: ${formatTime(timing.end - timing.start)}`;
+    } else {
+        timeString = `It took ${formatTime(timing.end - timing.start)}`;
+    }
+    if (code === 0) {
+        if (!options.mute) {
+            term.cyan(`Got Results:\n${output[0].join('')}\n^y${timeString}\n\n`);
+        }
+    } else {
+        switch (code) {
+            case 43:
+                if (!options.mute) {
+                    term.yellow(`${output[0].join('')}`);
+                    term.yellow(`${timeString}\n\n`);
+                }
+                break;
+            case 7:
+                if (!options.mute) {
+                    term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+                }
+                break;
+            case 69:
+                term.red(`Test failed with: ${code}:\n${output[1].join('')}`);
+                term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+                break;
+            default:
+                term.red(`Got Error with code ${code}:\n${output[1].join('')}`);
+                term.yellow(`${output[2].join('')}\n^y${timeString}\n\n`);
+        }
+    }
 }
 
 void (async (): Promise<never> => {

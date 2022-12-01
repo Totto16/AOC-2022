@@ -1,4 +1,4 @@
-import { CountFunction, PossibleFillTypes, PrintNestedMapFunction, StringOfLength } from './utils';
+import { CountFunction, PossibleFillTypes, PrintNestedMapFunction, StringOfLength } from './prototpyes';
 
 export {};
 declare global {
