@@ -196,7 +196,6 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
     abstract options: AdvancedStartOptions;
 
     parseInput(input: string[]): T {
-        // eslint-disable-next-line this/no-this
         return this.parse?.(input) ?? (input as unknown as T);
     }
 
@@ -220,13 +219,12 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         const testResult = testOptions.first.result;
         const testResult2 = testOptions.second.result;
 
-        // eslint-disable-next-line this/no-this
         const test = this.solve(this.parseInput(testInput), mute, true);
         if (test !== testResult) {
             console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
             process.exit(69);
         }
-        // eslint-disable-next-line this/no-this
+
         const test2 = this.solve2(this.parseInput(testInput2), mute, true);
         if (test2 !== testResult2) {
             console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
@@ -236,9 +234,9 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
 
     start(slowWarningHandler: typeof slowWarning): ExecuteResult<R> {
         const timing: TimingObject = { start: performance.now(), end: -1 };
-        // eslint-disable-next-line this/no-this
+
         const options: AdvancedStartOptions = this.options;
-        // eslint-disable-next-line this/no-this
+
         const testOptions: TestOptions<R> = this.tests;
 
         const args: ProgramOptions = parseArgs();
@@ -248,7 +246,6 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         }
 
         if (!args.noTests) {
-            // eslint-disable-next-line this/no-this
             this.testBoth(options, testOptions, args.mute);
             timing.tests = performance.now();
         }
@@ -266,15 +263,13 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         };
 
         const realInput = getFile('./input.txt', options.filename, separator, filterOutEmptyLines);
-        // eslint-disable-next-line this/no-this
+
         const parsed = this.parseInput(realInput);
 
-        // eslint-disable-next-line this/no-this
         const Answer = this.solve(parsed);
         timing.tests = performance.now();
         timing.part1 = performance.now();
 
-        // eslint-disable-next-line this/no-this
         const Answer2 = this.solve2(parsed);
         timing.part2 = performance.now();
 

@@ -42,6 +42,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
             return ['draw', 3];
         }
 
+        // eslint-disable-next-line security/detect-object-injection
         const winsAgainst = this.winMap[toPlay];
         if (winsAgainst === played) {
             return ['win', 6];
@@ -108,6 +109,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
             return played;
         }
 
+        // eslint-disable-next-line security/detect-object-injection
         const winsAgainst = this.winMap[played];
         if (stateToGet === 'lose') {
             return winsAgainst;

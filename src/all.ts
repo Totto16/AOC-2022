@@ -356,7 +356,7 @@ async function runProcess(
                 }
                 case 'time': {
                     const { what } = res as IPCMessage<'time'>;
-                    timing[what] = performance.now();
+                    timing[what as keyof TimingObject] = performance.now();
                     break;
                 }
                 case 'result': {

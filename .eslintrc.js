@@ -15,7 +15,6 @@ module.exports = {
       '@typescript-eslint',
       "import",
       "node",
-      "boundaries",
       "regexp",
       "this",
       "optimize-regex",
@@ -30,7 +29,6 @@ module.exports = {
       "plugin:import/typescript",
       "plugin:node/recommended",
       'plugin:@typescript-eslint/eslint-recommended',
-      "plugin:boundaries/recommended",
       "plugin:regexp/recommended",
       "plugin:security/recommended",
       "plugin:github/recommended",
@@ -70,13 +68,14 @@ module.exports = {
       "import/no-unresolved":"off",
       "no-var": "error",
       "eqeqeq": "error",
-      "this/no-this": "error",
       "optimize-regex/optimize-regex": "warn",
       "sort-imports": "off",
       "i18n-text/no-en":"off",
       "camelcase":"warn",
       "github/array-foreach":"warn",
       "no-console":"off",
-      "no-process-exit":"off"
-    }
+      "no-process-exit":"off",
+      "this/no-this":"off",
+      "@typescript-eslint/no-this-alias":"warn"
+    },
   };

@@ -6,11 +6,12 @@ function parseElves(input: string[]): number[][] {
     for (const inp of input) {
         if (inp === '') {
             ++i;
+            // eslint-disable-next-line security/detect-object-injection
             elves[i] = [];
             continue;
         }
 
-        elves[i].push(parseInt(inp.trim()));
+        elves.atSafe(i).push(parseInt(inp.trim()));
     }
 
     return elves;
