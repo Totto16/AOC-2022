@@ -224,6 +224,17 @@ export function initPrototypes(): void {
         },
     });
 
+    Object.defineProperty(Array.prototype, 'includesAll', {
+        value<T = unknown>(this: T[], singleArray: T[]): boolean {
+            for (const elem of singleArray) {
+                if (!this.includes(elem)) {
+                    return false;
+                }
+            }
+            return true;
+        },
+    });
+
     Object.defineProperty(Number.prototype, 'clamp', {
         value(this: number, min: number, max: number, endInclusive = false): number {
             const result = Math.max(Math.min(endInclusive ? max : max - 1, this), min);

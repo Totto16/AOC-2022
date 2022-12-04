@@ -25,6 +25,7 @@ declare global {
             constraintFunction?: (nr: number, index: number) => number
         ): Array<number>;
         sum(this: Array<number> | Array<number[]>, start?: number): number;
+        includesAll(this: Array<T>, array: Array<T>): boolean;
     }
 
     interface Object {
