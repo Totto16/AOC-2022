@@ -270,7 +270,8 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         timing.tests = performance.now();
         timing.part1 = performance.now();
 
-        const Answer2 = this.solve2(parsed);
+        const parsed2 = this.parseInput(realInput);
+        const Answer2 = this.solve2(parsed2);
         timing.part2 = performance.now();
 
         return { code: 0, timing, results: [Answer, Answer2] };

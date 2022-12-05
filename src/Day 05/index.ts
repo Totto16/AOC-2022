@@ -68,11 +68,8 @@ export default class Solution extends SolutionTemplate<ParseType, string> {
         const [stack, instructions] = input;
         for (const { amount, source, dest } of instructions) {
             const elements = stack[source].splice(-amount);
-            if (elements.length > 0) {
-                stack[dest].push(...elements);
-            }
+            stack[dest].push(...elements);
         }
-        console.log(stack);
         return stack.map((a) => a.atSafe(-1)).join('');
     }
 }
