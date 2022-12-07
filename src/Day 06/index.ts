@@ -19,7 +19,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
     };
 
     parse(input: string[]): ParseType {
-        assert(input.length === 0, 'invalid input');
+        assert(input.length === 1, 'invalid input');
         return input[0];
     }
 
