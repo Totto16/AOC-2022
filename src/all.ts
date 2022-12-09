@@ -239,7 +239,7 @@ async function runProcess(
                     const codeL = codeArg ?? code;
                     resolve({ code: codeL, output, timing, results: results as ResultArray });
                     throw new Error(
-                        'Error: after resolve, to assure the process.exit never returns, but resolve continued!'
+                        `process exited with code ${codeL}, (since miming process.exit with resolve, this error occurs every time, also with exit code 0)`
                     );
                 };
 
@@ -250,7 +250,7 @@ async function runProcess(
 
                     if (obj.options.slowness === undefined) {
                         timeout = setTimeout(() => {
-                            savedLog("TIMEOUT")
+                            savedLog('TIMEOUT');
                             term.red(
                                 `The slowness wasn't set, but the program was slow, as a safety measure you now are able to press 'c', to interrupt the program\n`
                             );
@@ -268,7 +268,7 @@ async function runProcess(
                                 }
                             });
                             return true;
-                        }, 3* 1000);
+                        }, 3 * 1000);
                     }
 
                     const result = obj.start((type: WarningType) => {

@@ -5,7 +5,12 @@ declare global {
     interface Array<T> {
         equals(array: Array<T>): boolean;
         includesArray<U = T>(this: Array<Array<U>>, array: Array<U>): boolean;
-        printNested<U = T>(this: Array<U> | Array<Array<U>>, mapFunction?: PrintNestedMapFunction<U>): boolean;
+        printNested<U = T>(
+            this: Array<U> | Array<Array<U>>,
+            mapFunction?: PrintNestedMapFunction<U>,
+            separator?: string,
+            EOL?: string
+        ): boolean;
         copy(): Array<T>;
         isArray(): true;
         count<U = T>(this: Array<U> | Array<Array<U>>, countFunction?: CountFunction<U>, startValue?: number): number;
@@ -51,5 +56,9 @@ declare global {
         ): this is StringOfLength<Min, Max>;
         toCharCode(this: string): number;
         replaceAt(this: string, index: number, replaceWith: string): string;
+    }
+
+    interface ArrayConstructor {
+        nested<T>(width: number, height: number, cb: (i: number, j: number) => T, offsetArr?: [number, number]): T[][];
     }
 }

@@ -307,6 +307,22 @@ export function initPrototypes(): void {
             return result;
         },
     });
+
+    Object.defineProperty(Array, 'nested', {
+        value<T = unknown>(
+            width: number,
+            height: number,
+            cb: (x: number, y: number) => T,
+            offsetArr: [number, number] = [0, 0]
+        ): T[][] {
+            const arr = new Array(height)
+                .fill(undefined)
+                .map((_, index) =>
+                    new Array(width).fill(undefined).map((__, ind2) => cb(offsetArr[1] + ind2, offsetArr[0] + index))
+                );
+            return arr;
+        },
+    });
 }
 
 export type PrintNestedMapFunction<T = unknown> = (a: T) => string;
