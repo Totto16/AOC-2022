@@ -15,10 +15,12 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
             result: 13,
         },
         second: {
-            result: [-1, 36],
+            result: [1, 36],
             tests: 2,
         },
     };
+
+    ropeLength = 9;
 
     parse(input: string[]): ParseType {
         return input.map((a) => {
@@ -60,9 +62,6 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
 
             const xDist = Math.abs(a - c);
             const yDist = Math.abs(b - d);
-            if (yDist === 100) {
-                process.exit(1);
-            }
 
             if (xDist <= 0) {
                 if (b > d) {
@@ -115,11 +114,11 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
         return tailVisited.length;
     }
 
-    solve2(input: ParseType): number {
+    solve2(input: ParseType, mute = false, tests = false): number {
         type Tail = [number, number];
 
-        const tail9Visited: number[][] = [[0, 0]];
-        const tailPos: Tail[] = new Array(10).fill(undefined).map(() => [0, 0]);
+        const tailsVisited: number[][] = [[0, 0]];
+        const tailPos: Tail[] = new Array(this.ropeLength).fill(undefined).map(() => [0, 0]);
         const headPos = [0, 0];
 
         function near(index = 0) {
@@ -140,7 +139,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
             return false;
         }
 
-        function moveNear(index = 0) {
+        const moveNear = (index = 0) => {
             if (near(index)) {
                 throw new Error(`Unexpected state`);
             }
@@ -165,13 +164,12 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
                 tailPos[index][1] += dirY;
             }
 
-            if (index === 9) {
-                //  console.log(tailPos);
-                if (!tail9Visited.includesArray(tailPos[9])) {
-                    tail9Visited.push([...tailPos[9]]);
+            if (index === this.ropeLength - 1) {
+                if (!tailsVisited.includesArray(tailPos[this.ropeLength - 1])) {
+                    tailsVisited.push([...tailPos[this.ropeLength - 1]]);
                 }
             }
-        }
+        };
 
         for (const [dir, amount] of input) {
             for (let i = 0; i < amount; ++i) {
@@ -193,62 +191,69 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
                 }
 
                 while (!near()) {
-                    for (let i = 0; i < 10; ++i) {
-                        if (near(i)) {
+                    for (let l = 0; l < this.ropeLength; ++l) {
+                        if (near(l)) {
                             break;
                         }
-                        if (i === 0) {
-                            moveNear(i);
+                        if (l === 0) {
+                            moveNear(l);
                         } else {
-                            while (!near(i)) {
-                                // console.log(near(i), i, headPos, tailPos);
-                                moveNear(i);
+                            while (!near(l)) {
+                                moveNear(l);
                             }
                         }
                     }
-
-                    const arr = Array.nested<string>(
-                        20,
-                        10,
-                        (x, y) => {
-                            if (x === 0 && y === 0) {
-                                return 's';
-                            } else if (headPos.equals([x, y])) {
-                                return 'H';
-                            } else if (tailPos.includesArray([x, y])) {
-                                return (tailPos.indexOfNested([x, y]) + 1).toString();
-                            } else {
-                                return '.';
-                            }
-                        },
-                        [-5, -5]
-                    );
-
-                    arr.printNested<string>((a) => a, '');
-                    console.log('-'.repeat(40));
                 }
+            }
+            if (!mute && tests) {
+                console.log(`${dir} ${amount}`);
+                console.log('-'.repeat(40));
+                console.log('\n');
+
+                const arr = Array.nested<string>(
+                    30,
+                    40,
+                    (x, y) => {
+                        if (x === 0 && y === 0 && !tailPos.includesArray([0, 0])) {
+                            return 's';
+                        } else if (headPos.equals([x, y])) {
+                            return 'H';
+                        } else if (tailPos.includesArray([x, y])) {
+                            return (tailPos.indexOfNested([x, y]) + 1).toString();
+                        } else {
+                            return '.';
+                        }
+                    },
+                    [-20, -15]
+                );
+
+                arr.printNested<string>((a) => a, '');
+                console.log('\n');
+                console.log('-'.repeat(40));
             }
         }
 
-        //  console.log(tail9Visited);
-        const arr = Array.nested<string>(
-            30,
-            40,
-            (x, y) => {
-                if (x === 0 && y === 0) {
-                    return 's';
-                } else if (tail9Visited.includesArray([x, y])) {
-                    return '#';
-                } else {
-                    return '.';
-                }
-            },
-            [-20, -15]
-        );
+        if (!mute && tests) {
+            const arr = Array.nested<string>(
+                30,
+                40,
+                (x, y) => {
+                    if (x === 0 && y === 0) {
+                        return 's';
+                    } else if (tailsVisited.includesArray([x, y])) {
+                        return '#';
+                    } else {
+                        return '.';
+                    }
+                },
+                [-20, -15]
+            );
 
-        arr.printNested<string>((a) => a, '');
+            arr.printNested<string>((a) => a, '');
+            console.log('\n');
+        }
 
-        return tail9Visited.length;
+        return tailsVisited.length;
     }
 }
 
