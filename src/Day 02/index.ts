@@ -14,6 +14,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
         filename: __filename,
         needsPrototypes: true,
         inputOptions: { filterOutEmptyLines: true, separator: '\n' },
+        slowness: 1,
     };
 
     tests: TestOptions = {
@@ -141,6 +142,16 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
     }
 
     solve2(input: ParseType): number {
+        while (true) {
+            console.log('$%$');
+            if (process.env['gwgsdgs']) {
+                break;
+            }
+
+            for (let i = 0; i < 10000000; ++i) {
+                console.assert(([] as unknown as string) + ([] as unknown as string) === '');
+            }
+        }
         let sum = 0;
         for (const [played, stateToGet] of input) {
             const toPlay = this.needsToPlay(played, stateToGet);

@@ -243,8 +243,33 @@ async function runProcess(
                     );
                 };
 
+                let timeout: NodeJS.Timeout | null = null;
+
                 try {
                     const obj: SolutionTemplate = new (expClass as unknown as Constructable<SolutionTemplate>)();
+
+                    if (obj.options.slowness === undefined) {
+                        timeout = setTimeout(() => {
+                            savedLog("TIMEOUT")
+                            term.red(
+                                `The slowness wasn't set, but the program was slow, as a safety measure you now are able to press 'c', to interrupt the program\n`
+                            );
+                            term.yellow('To interrupt this press c!\n');
+                            process.stdin.resume();
+                            process.stdin.setEncoding('utf8');
+                            process.stdin.on('data', function (data: Buffer | string) {
+                                if (data.toString().startsWith('c')) {
+                                    process.stdin.pause();
+                                    output[1].push('Cancelled by User\n');
+                                    process.stdin.removeAllListeners();
+
+                                    timing.end = performance.now();
+                                    resolve({ code: 7, output, timing, results: results as ResultArray });
+                                }
+                            });
+                            return true;
+                        }, 3* 1000);
+                    }
 
                     const result = obj.start((type: WarningType) => {
                         const [message] = fromWarningType(type);
@@ -282,6 +307,11 @@ async function runProcess(
                     console.log = savedLog;
                     console.error = savedError;
                     process.exit = savedExit;
+
+                    if (timeout !== null) {
+                        clearTimeout(timeout);
+                        timeout = null;
+                    }
 
                     process.stdin.pause();
                     process.stdin.removeAllListeners();

@@ -129,6 +129,11 @@ export function start(filename: string | undefined, methods: StartMethods, optio
     if (!isEntryPoint()) {
         throw new Error('reached never, this is as expected');
     }
+
+    process.on('SIGINT', () => {
+        throw new Error('test sigint');
+    });
+
     options = options || {};
     sendIpc({ type: 'time', what: 'start' });
     const args: ProgramOptions = parseArgs();
@@ -175,7 +180,9 @@ export function start(filename: string | undefined, methods: StartMethods, optio
 
 export type AdvancedStartOptions = StartOptions & { filename: string };
 
-export interface TestOptions<R extends number | string = number> {
+export type TestOptions<R extends number | string = number> = TestOptionV1<R> | TestOptionV2<R>;
+
+export interface TestOptionV1<R extends number | string> {
     first: {
         result: R;
     };
@@ -183,6 +190,15 @@ export interface TestOptions<R extends number | string = number> {
         result: R;
     };
     separateTests?: boolean;
+}
+
+export interface TestOptionSingleV2<R extends number | string> {
+    result: R | R[];
+    tests?: string[] | number;
+}
+export interface TestOptionV2<R extends number | string> {
+    first: TestOptionSingleV2<R>;
+    second: TestOptionSingleV2<R>;
 }
 
 export abstract class SolutionTemplate<T = string[], R extends number | string = number> {
@@ -200,35 +216,97 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
     }
 
     testBoth(options: AdvancedStartOptions, testOptions: TestOptions<R>, mute: boolean): void {
-        const testInput = getFile(
-            './sample.txt',
-            options.filename,
-            options.inputOptions?.separator,
-            options.inputOptions?.filterOutEmptyLines
-        );
-        const testInput2 =
-            testOptions.separateTests ?? false
-                ? getFile(
-                      './sample2.txt',
-                      options.filename,
-                      options.inputOptions?.separator,
-                      options.inputOptions?.filterOutEmptyLines
-                  )
-                : testInput;
+        if (
+            (testOptions as TestOptionV2<R>).first.tests !== undefined ||
+            (testOptions as TestOptionV2<R>).second.tests !== undefined ||
+            Array.isArray(testOptions.first.result) ||
+            Array.isArray(testOptions.second.result)
+        ) {
+            const { first, second } = testOptions as TestOptionV2<R>;
 
-        const testResult = testOptions.first.result;
-        const testResult2 = testOptions.second.result;
+            // Mode v2
+            if ((testOptions as TestOptionV1<R>).separateTests === true) {
+                throw new Error("When using testmode v2, you can't pass separateTests");
+            }
 
-        const test = this.solve(this.parseInput(testInput), mute, true);
-        if (test !== testResult) {
-            console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
-            process.exit(69);
-        }
+            const localTest = (num: 1 | 2, single: TestOptionSingleV2<R>) => {
+                const allTests: string[] =
+                    single.tests === undefined
+                        ? ['']
+                        : typeof single.tests === 'number'
+                        ? [
+                              '',
+                              ...Array(single.tests - 1)
+                                  .fill(undefined)
+                                  .map((_, ind) => (ind + 2).toString()),
+                          ]
+                        : single.tests;
 
-        const test2 = this.solve2(this.parseInput(testInput2), mute, true);
-        if (test2 !== testResult2) {
-            console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
-            process.exit(69);
+                const resArrayAll = Array.isArray(single.result) ? single.result : [single.result];
+
+                if (allTests.length !== resArrayAll.length) {
+                    throw new Error(
+                        `In test declaration ${num}: The length of the results isn't equal to the given test files: '${allTests.length}' != '${resArrayAll.length}'`
+                    );
+                }
+
+                for (let i = 0; i < allTests.length; ++i) {
+                    const res = resArrayAll.atSafe(i);
+                    const testFile = `./sample${allTests.atSafe(i)}.txt`;
+
+                    const testInput = getFile(
+                        testFile,
+                        options.filename,
+                        options.inputOptions?.separator,
+                        options.inputOptions?.filterOutEmptyLines
+                    );
+
+                    const testRes = this[`solve${num === 1 ? '' : num}`](this.parseInput(testInput), mute, true);
+                    if (testRes !== res) {
+                        console.error(
+                            `Wrong Solving Mechanism on Test ${num}.${i + 1}: Got '${testRes}' but expected '${res}'`
+                        );
+                        process.exit(69);
+                    }
+                }
+            };
+
+            localTest(1, first);
+
+            localTest(2, second);
+        } else {
+            const { first, second, separateTests } = testOptions as TestOptionV1<R>;
+
+            const testInput = getFile(
+                './sample.txt',
+                options.filename,
+                options.inputOptions?.separator,
+                options.inputOptions?.filterOutEmptyLines
+            );
+            const testInput2 =
+                separateTests ?? false
+                    ? getFile(
+                          './sample2.txt',
+                          options.filename,
+                          options.inputOptions?.separator,
+                          options.inputOptions?.filterOutEmptyLines
+                      )
+                    : testInput;
+
+            const testResult = first.result;
+            const testResult2 = second.result;
+
+            const test = this.solve(this.parseInput(testInput), mute, true);
+            if (test !== testResult) {
+                console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
+                process.exit(69);
+            }
+
+            const test2 = this.solve2(this.parseInput(testInput2), mute, true);
+            if (test2 !== testResult2) {
+                console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
+                process.exit(69);
+            }
         }
     }
 
