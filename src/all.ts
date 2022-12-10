@@ -20,6 +20,7 @@ import {
     fromWarningType,
     IPCTypes,
     IPCTypesMap,
+    PossibleSolutionTypes,
     ResultArray,
     SolutionTemplate,
     TimingObject,
@@ -176,11 +177,14 @@ function toArgs(options: ProgramOptions): ProgramStringOptions {
     return result;
 }
 
-export interface ProgramResult<R extends number | string = number | string> {
+export interface ProgramResult<
+    R extends PossibleSolutionTypes = PossibleSolutionTypes,
+    R2 extends PossibleSolutionTypes = R
+> {
     timing: TimingObject;
     code: number;
     output: OutputArray;
-    results: ResultArray<R>;
+    results: ResultArray<R, R2>;
 }
 
 export type IPCMessage<T extends IPCTypes = IPCTypes> = {
@@ -197,7 +201,7 @@ async function runProcess(
 ): Promise<ProgramResult> {
     const start = performance.now();
     const timing: TimingObject = { start, end: -1 };
-    const results: Array<number | string> = [];
+    const results: Array<PossibleSolutionTypes> = [];
 
     if (tryDynamicImport === true) {
         let exp = null;
@@ -264,7 +268,12 @@ async function runProcess(
                                     process.stdin.removeAllListeners();
 
                                     timing.end = performance.now();
-                                    resolve({ code: 7, output, timing, results: results as ResultArray });
+                                    resolve({
+                                        code: 7,
+                                        output,
+                                        timing,
+                                        results: results as ResultArray,
+                                    });
                                 }
                             });
                             return true;

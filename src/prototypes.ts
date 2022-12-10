@@ -35,7 +35,7 @@ export function initPrototypes(): void {
         },
     });
 
-    Object.defineProperty(Array.prototype, 'printNested', {
+    Object.defineProperty(Array.prototype, 'toNestedString', {
         value<T = unknown>(
             this: T[][] | T[],
             mapFunction: PrintNestedMapFunction<T> = (a: T): string => (a === 0 ? '.' : (a as string).toString()),
@@ -49,11 +49,22 @@ export function initPrototypes(): void {
                     }
                     return a.map((b: T) => mapFunction(b)).join(separator);
                 }).join(EOL);
-                console.log(toLog);
-                return true;
+                return toLog;
             } catch (e) {
-                return false;
+                return (e as Error).message;
             }
+        },
+    });
+
+    Object.defineProperty(Array.prototype, 'printNested', {
+        value<T = unknown>(
+            this: T[][] | T[],
+            mapFunction: PrintNestedMapFunction<T> = (a: T): string => (a === 0 ? '.' : (a as string).toString()),
+            separator = ' ',
+            EOL = '\n'
+        ) {
+            const toLog = this.toNestedString(mapFunction, separator, EOL);
+            console.log(toLog);
         },
     });
 

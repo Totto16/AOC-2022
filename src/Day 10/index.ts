@@ -16,23 +16,30 @@ type Instruction<T extends InstructionCode = InstructionCode> = {
 } & InstructionMap[T];
 
 type ParseType = Instruction[];
-export default class Solution extends SolutionTemplate<ParseType, number> {
+export default class Solution extends SolutionTemplate<ParseType, number, string> {
     options: AdvancedStartOptions = {
         filename: __filename,
         needsPrototypes: true,
         inputOptions: { filterOutEmptyLines: true, separator: '\n' },
     };
 
-    tests: TestOptions = {
+    tests: TestOptions<number, string> = {
         first: {
             result: 13140,
         },
         second: {
-            result: -1,
+            result: `
+##..##..##..##..##..##..##..##..##..##..
+###...###...###...###...###...###...###.
+####....####....####....####....####....
+#####.....#####.....#####.....#####.....
+######......######......######......####
+#######.......#######.......#######.....`,
         },
     };
 
     parse(input: string[]): ParseType {
+        // TODO: factor that out
         return input.map((inp) => {
             const parser: [InstructionCode, RegExp, (res: RegExpExecArray) => InstructionMap[InstructionCode]][] = [
                 [
@@ -100,7 +107,7 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
         return sum;
     }
 
-    solve2(input: ParseType, mute = false, isTest = false): number {
+    solve2(input: ParseType, mute = false, isTest = false): string {
         const [height, width] = [6, 40];
 
         const arr = Array.nested<boolean>(width, height, () => false);
@@ -123,21 +130,16 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
                 }
             }
         }
+        const solution = `\n${arr.toNestedString<boolean>((a) => (a ? '#' : '.'), '')}`;
         if (!mute && !isTest) {
-            arr.printNested<boolean>((a) => (a ? '#' : ' '), '');
+            console.log(solution);
             console.log('\n');
         }
 
         if (isTest) {
             //TODO better testcase coverability for such puzzles, parse this text automatically!
-            const expectet = `##..##..##..##..##..##..##..##..##..##..
-            ###...###...###...###...###...###...###.
-            ####....####....####....####....####....
-            #####.....#####.....#####.....#####.....
-            ######......######......######......####
-            #######.......#######.......#######.....`;
         }
-        return -1;
+        return solution;
     }
 }
 

@@ -10,7 +10,7 @@ declare global {
             mapFunction?: PrintNestedMapFunction<U>,
             separator?: string,
             EOL?: string
-        ): boolean;
+        ): void;
         copy(): Array<T>;
         isArray(): true;
         count<U = T>(this: Array<U> | Array<Array<U>>, countFunction?: CountFunction<U>, startValue?: number): number;
@@ -31,6 +31,12 @@ declare global {
         ): Array<number>;
         sum(this: Array<number> | Array<number[]>, start?: number): number;
         includesAll(this: Array<T>, array: Array<T>): boolean;
+        toNestedString<U = T>(
+            this: Array<U> | Array<Array<U>>,
+            mapFunction?: PrintNestedMapFunction<U>,
+            separator?: string,
+            EOL?: string
+        ): string;
     }
 
     interface Object {
