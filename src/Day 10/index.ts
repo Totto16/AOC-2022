@@ -45,7 +45,7 @@ export default class Solution extends SolutionTemplate<ParseType, number, string
                 [
                     'noop',
                     /noop/i,
-                    ([]): InstructionMap['noop'] => {
+                    (): InstructionMap['noop'] => {
                         return {};
                     },
                 ],

@@ -39,11 +39,11 @@ export function getFile(
     return result;
 }
 
-export type WarningType = 0 | 1 | 2;
+export type WarningType = 0 | 1 | 'moderately' | 'SLOW';
 
 export function fromWarningType(type: WarningType): [message: string, level: IPCLevel] {
-    const message = type === 0 ? 'Attention: Moderately Slow' : type === 1 ? 'ATTENTION: SLOW' : 'Unknown Slow Type';
-    const level = type === 0 ? 'moderate' : type === 1 ? 'severe' : 'unknown';
+    const message = type === 0 || type === 'moderately' ? 'Attention: Moderately Slow' : 'ATTENTION: SLOW';
+    const level = type === 0 || type === 'moderately' ? 'moderate' : 'severe';
     return [message, level];
 }
 
