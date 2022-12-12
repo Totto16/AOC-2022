@@ -54,5 +54,6 @@ To see them all you can run the help command.
 | [Day 9](https://adventofcode.com/2022/day/9) | ⭐ | ⭐ |
 | [Day 10](https://adventofcode.com/2022/day/10) | ⭐ | ⭐ |
 | [Day 11](https://adventofcode.com/2022/day/11) | ⭐ | ⭐ |
+| [Day 12](https://adventofcode.com/2022/day/12) | ⭐ | ⭐ |
 <!--- advent_readme_stars table --->
 
