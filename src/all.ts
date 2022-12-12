@@ -228,10 +228,18 @@ async function runProcess(
                 };
 
                 const savedError = console.error;
-                console.error = (...data: string[]) => {
-                    output[1].push(...data);
-                    if (options.debug) {
-                        savedError(...data, '\n');
+                console.error = (...data: any[]) => {
+                    for (const d of data) {
+                        if (d instanceof Error) {
+                            if (d.name === 'IgnoreError') {
+                                continue;
+                            }
+                        }
+
+                        output[1].push(d as string);
+                        if (options.debug) {
+                            savedError(d);
+                        }
                     }
                 };
 
@@ -242,9 +250,12 @@ async function runProcess(
                 process.exit = (codeArg?: number | undefined): never => {
                     const codeL = codeArg ?? code;
                     resolve({ code: codeL, output, timing, results: results as ResultArray });
-                    throw new Error(
+                    const err = new Error(
                         `process exited with code ${codeL}, (since miming process.exit with resolve, this error occurs every time, also with exit code 0)`
                     );
+                    err.name = 'IgnoreError';
+
+                    throw err;
                 };
 
                 let timeout: NodeJS.Timeout | null = null;
@@ -282,7 +293,7 @@ async function runProcess(
 
                     const result = obj.start((type: WarningType) => {
                         const [message] = fromWarningType(type);
-                        term.red(`${message}\n`);
+                        term.red(`ATTENTION: ${message}\n`);
                         term.yellow('To interrupt this press c!\n');
                         process.stdin.resume();
                         process.stdin.setEncoding('utf8');
@@ -434,56 +445,63 @@ async function runSolution(selected: DaysObject, options: ExtendedProgramOptions
     if (!options.mute) {
         term.green(`Now running Solution for Day ${selected.number.toString().padStart(2, '0')}:\n`);
     }
-    const { code, output, timing, results } = await runProcess(selected.filePath, options, true);
 
-    let timeString: string;
-    if (timing.end < 0 || timing.start < 0) {
-        timeString = '^rTiming error';
-    } else if (options.debug) {
-        timeString = 'Timings:\n';
-        const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
-            (a, b) => a[1] - b[1]
-        ) as ObjectEntries<TimingObject>;
+    try {
+        const { code, output, timing, results } = await runProcess(selected.filePath, options, true);
 
-        for (let index = 0; index < sortedTimings.length; ++index) {
-            const [name, time] = sortedTimings.atSafe(index);
-            if (name !== 'start' && time !== undefined) {
-                timeString += `^g${name}: ${formatTime(time - (sortedTimings[index - 1]?.[1] ?? 0))}${
-                    index < sortedTimings.length - 1 ? '\n' : '\n'
-                }`;
+        let timeString: string;
+        if (timing.end < 0 || timing.start < 0) {
+            timeString = '^rTiming error';
+        } else if (options.debug) {
+            timeString = 'Timings:\n';
+            const sortedTimings: ObjectEntries<TimingObject> = Object.entries(timing).sort(
+                (a, b) => a[1] - b[1]
+            ) as ObjectEntries<TimingObject>;
+
+            for (let index = 0; index < sortedTimings.length; ++index) {
+                const [name, time] = sortedTimings.atSafe(index);
+                if (name !== 'start' && time !== undefined) {
+                    timeString += `^g${name}: ${formatTime(time - (sortedTimings[index - 1]?.[1] ?? 0))}${
+                        index < sortedTimings.length - 1 ? '\n' : '\n'
+                    }`;
+                }
+            }
+            timeString += `^gall: ${formatTime(timing.end - timing.start)}`;
+        } else {
+            timeString = `It took ${formatTime(timing.end - timing.start)}`;
+        }
+        if (code === 0 && output[1].length === 0) {
+            if ((results as number[]).length !== 2) {
+                throw new Error(`Not enough results received, only got ${results.length}!`);
+            }
+            if (!options.mute) {
+                term.cyan(`Got Results:\nPart 1: '${results[0]}'\nPart 2: '${results[1]}'\n\n^y${timeString}\n\n`);
+            }
+        } else {
+            switch (code) {
+                case 43:
+                    if (!options.mute) {
+                        term.yellow(`${output[0].join('\n')}`);
+                        term.yellow(`${timeString}\n\n`);
+                    }
+                    break;
+                case 7:
+                    if (!options.mute) {
+                        term.yellow(`${output[1].join('\n')}\n^y${timeString}\n\n`);
+                    }
+                    break;
+                case 69:
+                    term.red(`Test failed with: ${code}:\n${output[1].join('\n')}`);
+                    term.yellow(`\n^y${timeString}\n\n`);
+                    break;
+                default:
+                    term.red(`Got Error with code ${code}:\n${output[1].join('\n')}`);
+                    term.yellow(`\n^y${timeString}\n\n`);
             }
         }
-        timeString += `^gall: ${formatTime(timing.end - timing.start)}`;
-    } else {
-        timeString = `It took ${formatTime(timing.end - timing.start)}`;
-    }
-    if (code === 0 && output[1].length === 0) {
-        if ((results as number[]).length !== 2) {
-            throw new Error(`Not enough results received, only got ${results.length}!`);
-        }
-        if (!options.mute) {
-            term.cyan(`Got Results:\nPart 1: '${results[0]}'\nPart 2: '${results[1]}'\n\n^y${timeString}\n\n`);
-        }
-    } else {
-        switch (code) {
-            case 43:
-                if (!options.mute) {
-                    term.yellow(`${output[0].join('\n')}`);
-                    term.yellow(`${timeString}\n\n`);
-                }
-                break;
-            case 7:
-                if (!options.mute) {
-                    term.yellow(`${output[1].join('\n')}\n^y${timeString}\n\n`);
-                }
-                break;
-            case 69:
-                term.red(`Test failed with: ${code}:\n${output[1].join('\n')}`);
-                term.yellow(`\n^y${timeString}\n\n`);
-                break;
-            default:
-                term.red(`Got Error with code ${code}:\n${output[1].join('\n')}`);
-                term.yellow(`\n^y${timeString}\n\n`);
+    } catch (error) {
+        if ((error as Error).name !== 'IgnoreError') {
+            console.error(error);
         }
     }
 }

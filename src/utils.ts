@@ -42,7 +42,7 @@ export function getFile(
 export type WarningType = 0 | 1 | 'moderately' | 'SLOW';
 
 export function fromWarningType(type: WarningType): [message: string, level: IPCLevel] {
-    const message = type === 0 || type === 'moderately' ? 'Attention: Moderately Slow' : 'ATTENTION: SLOW';
+    const message = type === 0 || type === 'moderately' ? 'Moderately Slow' : 'SLOW';
     const level = type === 0 || type === 'moderately' ? 'moderate' : 'severe';
     return [message, level];
 }
@@ -55,7 +55,7 @@ function slowWarning(type: WarningType) {
         process.exit(0);
     });
     const [message, level] = fromWarningType(type);
-    return sendIpc({ type: 'slow', message, level });
+    return sendIpc({ type: 'slow', message: `Attention: ${message}`, level });
 }
 
 export type IPCTypes = keyof IPCTypesMap;
@@ -145,7 +145,7 @@ export function start(filename: string | undefined, methods: StartMethods, optio
         sendIpc({ type: 'time', what: 'tests' });
     }
     if (options.slowness !== undefined && args.skipSlow) {
-        sendIpc({ type: 'message', message: 'Auto Skipped Moderately Slow\n' });
+        sendIpc({ type: 'message', message: `Auto Skipped ${fromWarningType(options.slowness)[0]}\n` });
         process.exit(43);
     }
     if (options.slowness !== undefined) {
@@ -334,7 +334,7 @@ export abstract class SolutionTemplate<
             timing.tests = performance.now();
         }
         if (options.slowness !== undefined && args.skipSlow) {
-            console.log('Auto Skipped Moderately Slow\n');
+            console.log(`Auto Skipped ${fromWarningType(options.slowness)[0]}\n`);
             process.exit(43);
         }
         if (options.slowness !== undefined) {
