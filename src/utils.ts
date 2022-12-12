@@ -39,11 +39,11 @@ export function getFile(
     return result;
 }
 
-export type WarningType = 0 | 1 | 2;
+export type WarningType = 0 | 1 | 'moderately' | 'SLOW';
 
 export function fromWarningType(type: WarningType): [message: string, level: IPCLevel] {
-    const message = type === 0 ? 'Attention: Moderately Slow' : type === 1 ? 'ATTENTION: SLOW' : 'Unknown Slow Type';
-    const level = type === 0 ? 'moderate' : type === 1 ? 'severe' : 'unknown';
+    const message = type === 0 || type === 'moderately' ? 'Moderately Slow' : 'SLOW';
+    const level = type === 0 || type === 'moderately' ? 'moderate' : 'severe';
     return [message, level];
 }
 
@@ -55,7 +55,7 @@ function slowWarning(type: WarningType) {
         process.exit(0);
     });
     const [message, level] = fromWarningType(type);
-    return sendIpc({ type: 'slow', message, level });
+    return sendIpc({ type: 'slow', message: `Attention: ${message}`, level });
 }
 
 export type IPCTypes = keyof IPCTypesMap;
@@ -66,7 +66,7 @@ export interface IPCTypesMap {
         level: IPCLevel;
     };
     result: {
-        value: number | string;
+        value: PossibleSolutionTypes;
     };
     message: { message: string };
     time: {
@@ -101,12 +101,10 @@ export interface StartOptions {
     };
 }
 
-export type SolveReturnType = number | string;
-
 export interface StartMethods {
     tests?: (mute: boolean) => void;
-    solve?: (input: string[], mute?: boolean) => SolveReturnType;
-    solve2?: (input: string[], mute?: boolean) => SolveReturnType;
+    solve?: (input: string[], mute?: boolean) => PossibleSolutionTypes;
+    solve2?: (input: string[], mute?: boolean) => PossibleSolutionTypes;
     solveMessage?: string;
     solve2Message?: string;
 }
@@ -129,6 +127,7 @@ export function start(filename: string | undefined, methods: StartMethods, optio
     if (!isEntryPoint()) {
         throw new Error('reached never, this is as expected');
     }
+
     options = options || {};
     sendIpc({ type: 'time', what: 'start' });
     const args: ProgramOptions = parseArgs();
@@ -142,7 +141,7 @@ export function start(filename: string | undefined, methods: StartMethods, optio
         sendIpc({ type: 'time', what: 'tests' });
     }
     if (options.slowness !== undefined && args.skipSlow) {
-        sendIpc({ type: 'message', message: 'Auto Skipped Moderately Slow\n' });
+        sendIpc({ type: 'message', message: `Auto Skipped ${fromWarningType(options.slowness)[0]}\n` });
         process.exit(43);
     }
     if (options.slowness !== undefined) {
@@ -175,23 +174,42 @@ export function start(filename: string | undefined, methods: StartMethods, optio
 
 export type AdvancedStartOptions = StartOptions & { filename: string };
 
-export interface TestOptions<R extends number | string = number> {
+export type TestOptions<R extends PossibleSolutionTypes = number, R2 extends PossibleSolutionTypes = R> =
+    | TestOptionV1<R, R2>
+    | TestOptionV2<R, R2>;
+
+export interface TestOptionV1<R extends PossibleSolutionTypes, R2 extends PossibleSolutionTypes = R> {
     first: {
         result: R;
     };
     second: {
-        result: R;
+        result: R2;
     };
     separateTests?: boolean;
 }
 
-export abstract class SolutionTemplate<T = string[], R extends number | string = number> {
+export interface TestOptionSingleV2<R extends PossibleSolutionTypes> {
+    result: R | R[];
+    tests?: string[] | number;
+}
+export interface TestOptionV2<R extends PossibleSolutionTypes, R2 extends PossibleSolutionTypes = R> {
+    first: TestOptionSingleV2<R>;
+    second: TestOptionSingleV2<R2>;
+}
+
+export type PossibleSolutionTypes = number | string | string[];
+
+export abstract class SolutionTemplate<
+    T = string[],
+    R extends PossibleSolutionTypes = number,
+    R2 extends PossibleSolutionTypes = R
+> {
     abstract solve(input: T, mute?: boolean, isTest?: boolean): R;
-    abstract solve2(input: T, mute?: boolean, isTest?: boolean): R;
+    abstract solve2(input: T, mute?: boolean, isTest?: boolean): R2;
 
     abstract parse?(input: string[]): T;
 
-    abstract tests: TestOptions<R>;
+    abstract tests: TestOptions<R, R2>;
 
     abstract options: AdvancedStartOptions;
 
@@ -199,45 +217,107 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
         return this.parse?.(input) ?? (input as unknown as T);
     }
 
-    testBoth(options: AdvancedStartOptions, testOptions: TestOptions<R>, mute: boolean): void {
-        const testInput = getFile(
-            './sample.txt',
-            options.filename,
-            options.inputOptions?.separator,
-            options.inputOptions?.filterOutEmptyLines
-        );
-        const testInput2 =
-            testOptions.separateTests ?? false
-                ? getFile(
-                      './sample2.txt',
-                      options.filename,
-                      options.inputOptions?.separator,
-                      options.inputOptions?.filterOutEmptyLines
-                  )
-                : testInput;
+    testBoth(options: AdvancedStartOptions, testOptions: TestOptions<R, R2>, mute: boolean): void {
+        if (
+            (testOptions as TestOptionV2<R, R2>).first.tests !== undefined ||
+            (testOptions as TestOptionV2<R, R2>).second.tests !== undefined ||
+            Array.isArray(testOptions.first.result) ||
+            Array.isArray(testOptions.second.result)
+        ) {
+            const { first, second } = testOptions as TestOptionV2<R, R2>;
 
-        const testResult = testOptions.first.result;
-        const testResult2 = testOptions.second.result;
+            // Mode v2
+            if ((testOptions as TestOptionV1<R, R2>).separateTests === true) {
+                throw new Error("When using testmode v2, you can't pass separateTests");
+            }
 
-        const test = this.solve(this.parseInput(testInput), mute, true);
-        if (test !== testResult) {
-            console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
-            process.exit(69);
-        }
+            const localTest = <E extends 1 | 2>(num: E, single: TestOptionSingleV2<E extends 1 ? R : R2>) => {
+                const allTests: string[] =
+                    single.tests === undefined
+                        ? ['']
+                        : typeof single.tests === 'number'
+                        ? [
+                              '',
+                              ...Array(single.tests - 1)
+                                  .fill(undefined)
+                                  .map((_, ind) => (ind + 2).toString()),
+                          ]
+                        : single.tests;
 
-        const test2 = this.solve2(this.parseInput(testInput2), mute, true);
-        if (test2 !== testResult2) {
-            console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
-            process.exit(69);
+                const resArrayAll = Array.isArray(single.result) ? single.result : [single.result];
+
+                if (allTests.length !== resArrayAll.length) {
+                    throw new Error(
+                        `In test declaration ${num}: The length of the results isn't equal to the given test files: '${allTests.length}' != '${resArrayAll.length}'`
+                    );
+                }
+
+                for (let i = 0; i < allTests.length; ++i) {
+                    const res = resArrayAll.atSafe(i);
+                    const testFile = `./sample${allTests.atSafe(i)}.txt`;
+
+                    const testInput = getFile(
+                        testFile,
+                        options.filename,
+                        options.inputOptions?.separator,
+                        options.inputOptions?.filterOutEmptyLines
+                    );
+
+                    const testRes = this[`solve${num === 1 ? '' : (num as 2)}`](this.parseInput(testInput), mute, true);
+                    if (!testEq(testRes, res)) {
+                        console.error(
+                            `Wrong Solving Mechanism on Test ${num}.${i + 1}: Got '${testRes}' but expected '${res}'`
+                        );
+                        process.exit(69);
+                    }
+                }
+            };
+
+            localTest(1, first);
+
+            localTest(2, second);
+        } else {
+            const { first, second, separateTests } = testOptions as TestOptionV1<R, R2>;
+
+            const testInput = getFile(
+                './sample.txt',
+                options.filename,
+                options.inputOptions?.separator,
+                options.inputOptions?.filterOutEmptyLines
+            );
+            const testInput2 =
+                separateTests ?? false
+                    ? getFile(
+                          './sample2.txt',
+                          options.filename,
+                          options.inputOptions?.separator,
+                          options.inputOptions?.filterOutEmptyLines
+                      )
+                    : testInput;
+
+            const testResult = first.result;
+            const testResult2 = second.result;
+
+            const test = this.solve(this.parseInput(testInput), mute, true);
+            if (!testEq(test, testResult)) {
+                console.error(`Wrong Solving Mechanism on Test 1: Got '${test}' but expected '${testResult}'`);
+                process.exit(69);
+            }
+
+            const test2 = this.solve2(this.parseInput(testInput2), mute, true);
+            if (!testEq(test2, testResult2)) {
+                console.error(`Wrong Solving Mechanism on Test 2: Got '${test2}' but expected '${testResult2}'`);
+                process.exit(69);
+            }
         }
     }
 
-    start(slowWarningHandler: typeof slowWarning): ExecuteResult<R> {
+    start(slowWarningHandler: typeof slowWarning): ExecuteResult<R, R2> {
         const timing: TimingObject = { start: performance.now(), end: -1 };
 
         const options: AdvancedStartOptions = this.options;
 
-        const testOptions: TestOptions<R> = this.tests;
+        const testOptions: TestOptions<R, R2> = this.tests;
 
         const args: ProgramOptions = parseArgs();
         logDebug(`parsed argv: `, args, 'real argv:', process.argv);
@@ -250,7 +330,7 @@ export abstract class SolutionTemplate<T = string[], R extends number | string =
             timing.tests = performance.now();
         }
         if (options.slowness !== undefined && args.skipSlow) {
-            console.log('Auto Skipped Moderately Slow\n');
+            console.log(`Auto Skipped ${fromWarningType(options.slowness)[0]}\n`);
             process.exit(43);
         }
         if (options.slowness !== undefined) {
@@ -294,10 +374,26 @@ export type TimingObject = {
     [key in OptionalTimingTypes]?: number;
 };
 
-export interface ExecuteResult<R extends number | string> {
+export interface ExecuteResult<R extends PossibleSolutionTypes, R2 extends PossibleSolutionTypes = R> {
     timing: TimingObject;
     code: number;
-    results: ResultArray<R>;
+    results: ResultArray<R, R2>;
 }
 
-export type ResultArray<R extends number | string = number | string> = [answer1: R, answer2: R];
+export type ResultArray<
+    R extends PossibleSolutionTypes = PossibleSolutionTypes,
+    R2 extends PossibleSolutionTypes = R
+> = [answer1: R, answer2: R2];
+
+export function testEq<R extends PossibleSolutionTypes = PossibleSolutionTypes>(test: R, result: R): boolean {
+    if (Array.isArray(test)) {
+        if (typeof test[0] !== typeof (result as Array<unknown>)[0]) {
+            return false;
+        }
+        return test.equals(result as Array<string>);
+    } else if (typeof test === 'number' || typeof test === 'string') {
+        return test === result;
+    } else {
+        throw new Error(`FATAL, unreachable: in testEq of testResults`);
+    }
+}

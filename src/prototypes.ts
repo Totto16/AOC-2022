@@ -1,3 +1,5 @@
+import EventEmitter from 'events';
+
 export function initPrototypes(): void {
     // "header guard" to not execute multiple times
     // eslint-disable-next-line no-prototype-builtins
@@ -35,7 +37,7 @@ export function initPrototypes(): void {
         },
     });
 
-    Object.defineProperty(Array.prototype, 'printNested', {
+    Object.defineProperty(Array.prototype, 'toNestedString', {
         value<T = unknown>(
             this: T[][] | T[],
             mapFunction: PrintNestedMapFunction<T> = (a: T): string => (a === 0 ? '.' : (a as string).toString()),
@@ -49,11 +51,22 @@ export function initPrototypes(): void {
                     }
                     return a.map((b: T) => mapFunction(b)).join(separator);
                 }).join(EOL);
-                console.log(toLog);
-                return true;
+                return toLog;
             } catch (e) {
-                return false;
+                return (e as Error).message;
             }
+        },
+    });
+
+    Object.defineProperty(Array.prototype, 'printNested', {
+        value<T = unknown>(
+            this: T[][] | T[],
+            mapFunction: PrintNestedMapFunction<T> = (a: T): string => (a === 0 ? '.' : (a as string).toString()),
+            separator = ' ',
+            EOL = '\n'
+        ) {
+            const toLog = this.toNestedString(mapFunction, separator, EOL);
+            console.log(toLog);
         },
     });
 
@@ -307,6 +320,22 @@ export function initPrototypes(): void {
             return result;
         },
     });
+
+    Object.defineProperty(Array, 'nested', {
+        value<T = unknown>(
+            width: number,
+            height: number,
+            cb: (x: number, y: number) => T,
+            offsetArr: [number, number] = [0, 0]
+        ): T[][] {
+            const arr = new Array(height)
+                .fill(undefined)
+                .map((_, index) =>
+                    new Array(width).fill(undefined).map((__, ind2) => cb(offsetArr[1] + ind2, offsetArr[0] + index))
+                );
+            return arr;
+        },
+    });
 }
 
 export type PrintNestedMapFunction<T = unknown> = (a: T) => string;
@@ -319,3 +348,19 @@ export type PossibleFillTypes = [number, '..', number] | ['..', number] | [numbe
 export type StringOfLength<Min, Max> = string & {
     readonly StringOfLength: unique symbol; // this is the phantom type
 };
+
+export function ListenToAllEvents(): void {
+    const items = new Set();
+    const originalEmit = EventEmitter.prototype.emit;
+    EventEmitter.prototype.emit = function (event: string | symbol, ...args: any[]): boolean {
+        // Do what you want here
+        const id = this.constructor.name + ':' + event.toString();
+        if (!items.has(id)) {
+            items.add(id);
+            console.log(id, args);
+        }
+
+        // And then call the original
+        return originalEmit.call(this, event, ...args);
+    };
+}
