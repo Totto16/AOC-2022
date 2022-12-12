@@ -1,3 +1,5 @@
+import EventEmitter from 'events';
+
 export function initPrototypes(): void {
     // "header guard" to not execute multiple times
     // eslint-disable-next-line no-prototype-builtins
@@ -346,3 +348,19 @@ export type PossibleFillTypes = [number, '..', number] | ['..', number] | [numbe
 export type StringOfLength<Min, Max> = string & {
     readonly StringOfLength: unique symbol; // this is the phantom type
 };
+
+export function ListenToAllEvents(): void {
+    const items = new Set();
+    const originalEmit = EventEmitter.prototype.emit;
+    EventEmitter.prototype.emit = function (event: string | symbol, ...args: any[]): boolean {
+        // Do what you want here
+        const id = this.constructor.name + ':' + event.toString();
+        if (!items.has(id)) {
+            items.add(id);
+            console.log(id, args);
+        }
+
+        // And then call the original
+        return originalEmit.call(this, event, ...args);
+    };
+}

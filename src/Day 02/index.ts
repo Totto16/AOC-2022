@@ -142,14 +142,20 @@ export default class Solution extends SolutionTemplate<ParseType, number> {
     }
 
     solve2(input: ParseType): number {
+        let z = 0;
         while (true) {
-            console.log('$%$');
             if (process.env['gwgsdgs']) {
                 break;
             }
+            console.log('$%$' + z + ' /' + 10);
 
-            for (let i = 0; i < 10000000; ++i) {
+            for (let i = 0; i < 1000000; ++i) {
                 console.assert(([] as unknown as string) + ([] as unknown as string) === '');
+            }
+            z++;
+
+            if (z > 10) {
+                break;
             }
         }
         let sum = 0;

@@ -128,10 +128,6 @@ export function start(filename: string | undefined, methods: StartMethods, optio
         throw new Error('reached never, this is as expected');
     }
 
-    process.on('SIGINT', () => {
-        throw new Error('test sigint');
-    });
-
     options = options || {};
     sendIpc({ type: 'time', what: 'start' });
     const args: ProgramOptions = parseArgs();
